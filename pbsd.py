@@ -28,7 +28,7 @@ class BloomRouter(object):
             - items: The set of items to get!
         """
         shard_hash = _get_shard_hash(items, self.filters)
-        return all([all(self.connection["{}-{}".format(self.prefix, shard)].multi(items)) 
+        return any([any(self.connection["{}-{}".format(self.prefix, shard)].multi(items)) 
                     for shard, items_per_shard in shard_hash.iteritems()])
 
     def add(self, items):
