@@ -59,7 +59,7 @@ def _get_shard_hash(items, number_of_filters):
     return item_by_shard
 
 
-client = BloomRouter(["bar"], "Random_prefix{}".format(random.randint(1, 100000)))
+client = BloomRouter(["bloom1, bloom2, bloom3, bloom4"], "Random_large_prefix{}".format(random.randint(1, 100000)))
 
 keys = ["Test key{} ".format(random.randint(1, 10000))]
 # Set a property and check it exists

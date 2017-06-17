@@ -1,0 +1,13 @@
+version: "2"
+services:
+  bloom1:
+    build: bloomd_docker_scaff
+  bloom2:
+    build: bloomd_docker_scaff
+  bloom3:
+    build: bloomd_docker_scaff
+  bloom4:
+    build: bloomd_docker_scaff
+  tester:
+    build: .
+    links: [bloom1, bloom2, bloom3, bloom4]
