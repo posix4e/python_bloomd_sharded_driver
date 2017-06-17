@@ -10,7 +10,7 @@ class BloomRouter(object):
     def __init__(self,
                  server,
                  prefix="default-",
-                 filter_count=16,
+                 filter_count=1,
                  # These options we abstract over
                  capacity=16000 * 1000, prob=None,
                  in_memory=False):
@@ -55,8 +55,10 @@ class BloomRouter(object):
             - items: The set of items to get!
         """
         shard_hash = _get_shard_hash(items, self.filter_count)
-        return any([any(self.connection["{}-{}".format(self.prefix, shard)].multi(items))
-                    for shard, items_per_shard in shard_hash.iteritems()])
+        for shard, items_per_shard in shard_hash.iteritems():
+            if any(self.connection["{}-{}".format(self.prefix, shard)].multi(items)):
+                return True
+        return False
 
     def all(self, items):
         """
@@ -76,9 +78,8 @@ class BloomRouter(object):
         :Parameters:
             - items: The set of items to get!
         """
-        shard_hash = _get_shard_hash(items, self.filter_count)
         return [self.connection["{}-{}".format(self.prefix, shard)].multi(items)
-                for shard, items_per_shard in shard_hash.iteritems()]
+                for shard, items_per_shard in _get_shard_hash(items, self.filter_count).iteritems()]
 
     def add(self, items):
         """
@@ -87,8 +88,7 @@ class BloomRouter(object):
         :Parameters:
             - items: The set of items to get!
         """
-        shard_hash = _get_shard_hash(items, self.filter_count)
-        for shard, items_per_shard in shard_hash.iteritems():
+        for shard, items_per_shard in _get_shard_hash(items, self.filter_count).iteritems():
             self.connection["{}-{}".format(self.prefix, shard)].bulk(items)
 
 
@@ -97,15 +97,15 @@ def _get_shard(item, number_of_filters):
 
 
 def _get_shard_hash(items, number_of_filters):
-    item_by_shard = {}
+    items_by_shard = {}
 
     for item in items:
         shard = _get_shard(item, number_of_filters)
-        if shard not in item_by_shard:
-            item_by_shard[shard] = []
-        item_by_shard[shard].append(item)
+        if shard not in items_by_shard:
+            items_by_shard[shard] = []
+        items_by_shard[shard].append(item)
 
-    return item_by_shard
+    return items_by_shard
 #
 # It's al testing code below this
 #
@@ -121,8 +121,8 @@ def timing(f):
     return wrap
 
 
-num_keys = 100
-testsize = 10000
+num_keys = 8192
+testsize = 10
 
 
 @timing
@@ -132,8 +132,8 @@ def test_one_node():
     keys = [str(uuid.uuid4()) for _ in range(num_keys)]
     client.add(keys)
 
-    assert client.get(keys) is True
-    assert client.all(keys) is True
+    assert client.get(keys)
+    assert client.all(keys)
 
 
 @timing
@@ -143,13 +143,13 @@ def test_many_nodes():
     keys = [str(uuid.uuid4()) for _ in range(num_keys)]
     client.add(keys)
 
-    assert client.get(keys) is True
-    assert client.all(keys) is True
+    assert client.get(keys)
+    assert client.all(keys)
 
 
 @timing
 def benchmark_put():
-    hosts = ["bloom1"]
+    hosts = ["bloom1", "bloom2", "bloom3", "bloom4"]
     client = BloomRouter(hosts, "g{}".format(random.randint(1, 100000)))
     progress = NyanBar(tasks=testsize)
     for i in range(testsize):
@@ -160,15 +160,40 @@ def benchmark_put():
 
 
 @timing
-def benchmark_and_all_after_put():
+def benchmark_put_with_many_filters():
     hosts = ["bloom1", "bloom2", "bloom3", "bloom4"]
-    client = BloomRouter(hosts, "f{}".format(random.randint(1, 100000)))
+    client = BloomRouter(hosts, "g{}".format(random.randint(1, 100000), filter_count=16))
     progress = NyanBar(tasks=testsize)
     for i in range(testsize):
         progress.task_done()
         keys = [str(uuid.uuid4()) for _ in range(num_keys)]
         client.add(keys)
-        assert client.all(keys) is True
+    progress.finish()
+
+
+@timing
+def put_then_get_with_one_filter():
+    hosts = ["bloom1", "bloom2", "bloom3", "bloom4"]
+    client = BloomRouter(hosts, "f{}".format(random.randint(1, 100000)), filter_count=1)
+    progress = NyanBar(tasks=testsize)
+    for i in range(testsize):
+        progress.task_done()
+        keys = [str(uuid.uuid4()) for _ in range(num_keys)]
+        client.add(keys)
+        assert client.get(keys)
+    progress.finish()
+
+
+@timing
+def put_then_get_with_many_filters():
+    hosts = ["bloom1", "bloom2", "bloom3", "bloom4"]
+    client = BloomRouter(hosts, "f{}".format(random.randint(1, 100000)), filter_count=16)
+    progress = NyanBar(tasks=testsize)
+    for i in range(testsize):
+        progress.task_done()
+        keys = [str(uuid.uuid4()) for _ in range(num_keys)]
+        client.add(keys)
+        assert client.get(keys)
     progress.finish()
 
 
@@ -178,5 +203,7 @@ test_many_nodes()
 print("TESTS DONE!")
 print("Benchmarks Go!")
 benchmark_put()
-benchmark_and_all_after_put()
+benchmark_put_with_many_filters()
+put_then_get_with_one_filter()
+put_then_get_with_many_filters()
 print("Benchmarks DONE!")
