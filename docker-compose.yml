@@ -10,4 +10,4 @@ services:
     build: bloomd_docker_scaff
   tester:
     build: .
-    links: [bloom1, bloom2, bloom3, bloom4]
+    depends_on: [bloom1,bloom2,bloom3,bloom4]
