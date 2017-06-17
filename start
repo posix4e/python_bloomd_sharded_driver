@@ -1,0 +1,7 @@
+#!/bin/sh -ex
+set -ex
+
+IMAGE=${1-foo}
+NAME_OF_BLOOM=${2-bar}
+docker build -t ${IMAGE} .
+docker run --link bar:bar -ti ${IMAGE} 

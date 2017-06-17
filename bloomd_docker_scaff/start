@@ -1,0 +1,8 @@
+#!/bin/sh -ex
+IMAGE=${1-foo}
+NAME=${2-bar}
+TCP_PORT=8673
+
+docker build -t ${IMAGE} .
+docker run -ti  --name ${NAME} -p ${TCP_PORT}:${TCP_PORT}  ${IMAGE}
+docker rm ${NAME}
