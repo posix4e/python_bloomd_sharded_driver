@@ -2,6 +2,7 @@ from pybloomd import BloomdClient
 import random
 import time
 import uuid
+import hashlib
 from nyanbar import NyanBar
 
 
@@ -93,7 +94,9 @@ class BloomRouter(object):
 
 
 def _get_shard(item, number_of_filters):
-    return hash(item) % number_of_filters
+    a = ord(hashlib.md5(item).hexdigest()[:1])
+    b = ord(hashlib.md5(item).hexdigest()[1:2])
+    return (a * b) % number_of_filters
 
 
 def _get_shard_hash(items, number_of_filters):
